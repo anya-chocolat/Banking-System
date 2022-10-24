@@ -7,17 +7,21 @@ import java.util.Currency;
 
 @Embeddable
 public class Money {
-
-    private static final Currency SUR = Currency.getInstance("SUR");
+    private static final Currency ESP = Currency.getInstance("ESP");
     private static final RoundingMode DEFAULT_ROUNDING = RoundingMode.HALF_EVEN;
-
     private final Currency currency;
     private BigDecimal amount;
 
     /**
+     * Empty class constructor
+     **/
+    public Money() {
+        this.currency = ESP;
+    }
+
+    /**
      * Class constructor specifying amount, currency, and rounding
      **/
-
     public Money(BigDecimal amount, Currency currency, RoundingMode rounding) {
         this.currency = currency;
         setAmount(amount.setScale(currency.getDefaultFractionDigits(), rounding));
@@ -31,10 +35,10 @@ public class Money {
     }
 
     /**
-     * Class constructor specifying amount. Uses default RoundingMode HALF_EVEN and default currency USD.
+     * Class constructor specifying amount. Uses default RoundingMode HALF_EVEN and default currency SUR.
      **/
     public Money(BigDecimal amount) {
-        this(amount, USD, DEFAULT_ROUNDING);
+        this(amount, ESP, DEFAULT_ROUNDING);
     }
 
     public BigDecimal increaseAmount(Money money) {
