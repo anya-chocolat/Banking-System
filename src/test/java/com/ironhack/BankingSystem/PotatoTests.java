@@ -1,6 +1,10 @@
 package com.ironhack.BankingSystem;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.ironhack.BankingSystem.DTOs.AccountHolderDTO;
+import com.ironhack.BankingSystem.DTOs.AdminDTO;
+import com.ironhack.BankingSystem.DTOs.TransferDTO;
 import com.ironhack.BankingSystem.embeddables.Address;
 import com.ironhack.BankingSystem.embeddables.Money;
 import com.ironhack.BankingSystem.entities.accounts.CheckingAccount;
@@ -10,6 +14,7 @@ import com.ironhack.BankingSystem.entities.accounts.StudentCheckingAccount;
 import com.ironhack.BankingSystem.entities.users.AccountHolder;
 import com.ironhack.BankingSystem.entities.users.Admin;
 import com.ironhack.BankingSystem.entities.users.Role;
+import com.ironhack.BankingSystem.entities.users.ThirdParty;
 import com.ironhack.BankingSystem.repositories.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,8 +32,8 @@ import org.springframework.web.context.WebApplicationContext;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -61,14 +66,20 @@ public class PotatoTests {
     @Autowired
     PasswordEncoder passwordEncoder;
     private MockMvc mockMvc;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+
+    CheckingAccount fernandoChecking;
+    StudentCheckingAccount landoChecking;
+    SavingsAccount sainzSavings;
+    CreditCard creditCard;
+    ThirdParty thirdParty;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
 
-        Admin admin = new Admin("Toto", passwordEncoder.encode("MercedesF1"), "Torger Christian Wolff");
-        roleRepository.save(new Role("ADMIN", admin));
+        Admin toto = adminRepository.save(new Admin("Toto", passwordEncoder.encode("MercedesF1"), "Torger Christian Wolff"));
+        roleRepository.save(new Role("ADMIN", toto));
 
         Address montmelo = new Address("Circuit de Barcelona-Catalunya", "Montmeló", "08160", "Barcelona", "Spain");
         Address monza = new Address("Autodromo Nazionale di Monza", "Monza", "20900", "Province of Monza and Brianza", "Italy");
@@ -84,10 +95,11 @@ public class PotatoTests {
         roleRepository.save(new Role("CLIENT", lando));
         roleRepository.save(new Role("CLIENT", max));
 
-        CheckingAccount fernandoChecking = checkingAccountRepository.save(new CheckingAccount(new Money(BigDecimal.valueOf(28000)), 1981, fernando, null));
-        StudentCheckingAccount landoChecking = studentCheckingAccountRepository.save(new StudentCheckingAccount(new Money(BigDecimal.valueOf(6900)), 1999, lando, null));
-        SavingsAccount sainzSavings = savingsAccountRepository.save(new SavingsAccount(new Money(BigDecimal.valueOf(100500)), 1234, sainz, carlos, new Money(BigDecimal.valueOf(1000)), BigDecimal.valueOf(0.25)));
-        CreditCard creditCard = creditCardRepository.save(new CreditCard(new Money(BigDecimal.valueOf(420420)), 0000, max, null, new Money(BigDecimal.valueOf(99999)), BigDecimal.valueOf(0.2)));
+        fernandoChecking = checkingAccountRepository.save(new CheckingAccount(new Money(BigDecimal.valueOf(28000)), 1981, fernando, null));
+        landoChecking = studentCheckingAccountRepository.save(new StudentCheckingAccount(new Money(BigDecimal.valueOf(6900)), 1999, lando, null));
+        sainzSavings = savingsAccountRepository.save(new SavingsAccount(new Money(BigDecimal.valueOf(100500)), 1234, sainz, carlos, new Money(BigDecimal.valueOf(1000)), BigDecimal.valueOf(0.25)));
+        creditCard = creditCardRepository.save(new CreditCard(new Money(BigDecimal.valueOf(420420)), 0000, max, null, new Money(BigDecimal.valueOf(99999)), BigDecimal.valueOf(0.2)));
+        thirdParty = thirdPartyRepository.save(new ThirdParty("Ferrari", "1234"));
     }
 
     @AfterEach
@@ -105,12 +117,49 @@ public class PotatoTests {
         accountRepository.deleteAll();
     }
 
+    @Test
+    @WithMockUser("toto")
+    void showUsers_works() throws Exception {
+        MvcResult mvcResult = mockMvc.perform(get("/users")).andExpect(status().isOk()).andReturn();
+        assertTrue(mvcResult.getResponse().getContentAsString().contains("Fernando Alonso"));
+        assertTrue(mvcResult.getResponse().getContentAsString().contains("Carlos Sainz"));
+    }
+
+    @Test
+    @WithMockUser("toto")
+    void addAdmin_works() throws Exception {
+        AdminDTO adminDTO = new AdminDTO("guenther", "Haas1965", "Guenther Steiner");
+        String body = objectMapper.writeValueAsString(adminDTO);
+        MvcResult mvcResult = mockMvc.perform(post("/users/admin").content(body).contentType(MediaType.APPLICATION_JSON)).andExpect(status().isCreated()).andReturn();
+        assertTrue(mvcResult.getResponse().getContentAsString().contains("Guenther Steiner"));
+    }
+
+    @Test
+    @WithMockUser("fernando")
+    void transfer_works() throws Exception {
+        TransferDTO transferDTO = new TransferDTO(fernandoChecking.getPrimaryOwner().getName(), fernandoChecking.getNumber(), landoChecking.getNumber(), BigDecimal.valueOf(8000));
+        String body = objectMapper.writeValueAsString(transferDTO);
+        MvcResult mvcResult = mockMvc.perform(patch("/transfer").content(body).contentType(MediaType.APPLICATION_JSON)).andExpect(status().isOk()).andReturn();
+        assertTrue(mvcResult.getResponse().getContentAsString().contains("Fernando Alonso"));
+        assertTrue(fernandoChecking.getBalance().getAmount().toString().contains("20000"));
+    }
+
 //    @Test
-//    @WithMockUser("sainz")
-//    void checkBalance_works() throws Exception {
-//        MvcResult mvcResult = mockMvc.perform(get("/check-balance").param("id", "3").contentType(MediaType.APPLICATION_JSON)).andExpect(status().isFound()).andReturn();
-//        assertEquals(BigDecimal.valueOf(100500), accountRepository.findById(3L).get().getBalance().getAmount());
+//    @WithMockUser("toto")
+//    void addAccountHolder_works() throws Exception {
+//        AccountHolderDTO accountHolderDTO = new AccountHolderDTO("SainzJr", "Ferrari", "Carlos Sainz", LocalDate.of(1994, 9, 1), "Circuit de Barcelona-Catalunya", "Montmeló", "08160", "Barcelona", "Spain", "Autodromo Nazionale di Monza", "Monza", "20900", "Province of Monza and Brianza", "Italy");
+//        String body = objectMapper.writeValueAsString(accountHolderDTO);
+//        MvcResult mvcResult = mockMvc.perform(post("/users/client").content(body).contentType(MediaType.APPLICATION_JSON)).andExpect(status().isCreated()).andReturn();
+//        assertTrue(mvcResult.getResponse().getContentAsString().contains("Carlos Sainz"));
+//        //assertTrue(mvcResult.getResponse().getContentAsString().contains("Circuit de Barcelona-Catalunya"));
 //    }
 
+
+    @Test
+    @WithMockUser("sainz")
+    void checkBalance_works() throws Exception {
+        MvcResult mvcResult = mockMvc.perform(get("/check-balance").param("id", sainzSavings.getNumber().toString()).contentType(MediaType.APPLICATION_JSON)).andExpect(status().isFound()).andReturn();
+        assertTrue(mvcResult.getResponse().getContentAsString().contains("100500"));
+    }
 
 }

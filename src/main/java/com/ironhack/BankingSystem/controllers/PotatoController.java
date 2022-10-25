@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.List;
 
-@Controller
+@RestController
 public class PotatoController {
     @Autowired
     PotatoServiceInterface potatoService;
@@ -30,6 +30,7 @@ public class PotatoController {
     PotatoUserServiceInterface potatoUserService;
 
     @GetMapping("/users")
+    @ResponseStatus(HttpStatus.OK)
     public List<User> showUsers(@AuthenticationPrincipal UserDetails userDetails) {
         return potatoUserService.showUsers(userDetails);
     }

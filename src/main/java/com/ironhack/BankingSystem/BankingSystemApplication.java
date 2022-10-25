@@ -8,10 +8,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class BankingSystemApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(BankingSystemApplication.class, args);
-		Account acc = new CheckingAccount();
-		System.out.println(acc.toString());
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(BankingSystemApplication.class, args);
+    }
 
 }
